@@ -21,8 +21,8 @@ typedef enum
     YELLOW
 } State;
 
-volatile uint16_t digitalCounter = 0;
-volatile uint16_t stateCounter = 0;
+ volatile uint16_t digitalCounter = 0;
+ volatile uint16_t secondCounter = 0;
 volatile uint8_t digit = 0;
 volatile State currentState = RED;
 
@@ -84,22 +84,22 @@ void display_digit(int digit)
 
 void changeState(State currentState)
 {
-    // Ustawienie pinów A0, A1, A2 jako wyjścia (odpowiadają PC0, PC1, PC2)
+    // enable pins
     DDRC |= (1 << PC0) | (1 << PC1) | (1 << PC2);
 
-    // Resetowanie wszystkich pinów (wyłączanie wszystkich diod)
+    // reset  pins
     PORTC &= ~((1 << PC0) | (1 << PC1) | (1 << PC2));
 
     switch (currentState)
     {
     case RED:
-        PORTC |= (1 << PC0); // Włącz diodę czerwoną (A0)
+        PORTC |= (1 << PC0); // enable red led (A0)
         break;
     case GREEN:
-        PORTC |= (1 << PC1); // Włącz diodę zieloną (A1)
+        PORTC |= (1 << PC1); // enable green led (A1)
         break;
     case YELLOW:
-        PORTC |= (1 << PC2); // Włącz diodę żółtą (A2)
+        PORTC |= (1 << PC2); // enable yellow led (A2)
         break;
     default:
         break;
@@ -109,20 +109,23 @@ void changeState(State currentState)
 // conf Timer1
 void timer1_init()
 {
-    TCCR1A = 0;                                        // Normal mode
-    TCCR1B = (1 << WGM12) | (1 << CS12) | (1 << CS10); // CTC mode, prescaler 1024
-    OCR1A = 31249;                                     // Compare match value for 1 second
-    TIMSK1 = (1 << OCIE1A);                            // Enable compare interrupt
-    sei();                                             // Enable global interrupts
+    TCCR1A = 0; // Normal mode (CTC bez PWM)
+    TCCR1B = 0;
+    TCCR1B |= (1 << WGM12) | (1 << CS12) | (1 << CS10); // CTC mode, prescaler 1024
+    OCR1A = 15624;                                      // Compare match value for 1 second
+    TIMSK1 |= (1 << OCIE1A);                            // Enable compare interrupt for Timer1
+    sei();                                              // Enable global interrupts
 }
 
 ISR(TIMER1_COMPA_vect)
 {
+
     digitalCounter++;
-    stateCounter++;
+    secondCounter++;
+    PORTC ^= (1 << PC3);// reprezent 1 sec
 
     // update the number  every 1 second
-    if (digitalCounter < 1000)
+    if (digitalCounter >= 1)
     {
         display_digit(digit);
         digit = (digit + 1) % 10;
@@ -130,7 +133,7 @@ ISR(TIMER1_COMPA_vect)
     }
 
     // update state traffic light
-    if (stateCounter < 1000)
+    if (secondCounter >= 9)
     { // 9 sec every state
         if (currentState == RED)
         {
@@ -145,23 +148,21 @@ ISR(TIMER1_COMPA_vect)
             currentState = RED;
         }
         changeState(currentState);
-        stateCounter = 0; // Reset licznika
+        secondCounter = 0; // reset counter
     }
-
-    // update the state every 9 seconds)
 }
 
 int main(void)
 {
     DDRD |= 0xff;
     DDRB |= 0xff;
+    DDRC |= (1 << PC0) | (1 << PC1) | (1 << PC2) | (1 << PC3);
 
     changeState(currentState); // enable initial state
     timer1_init();             // timer init
-    set_sleep_mode(SLEEP_MODE_IDLE);
+                               // set_sleep_mode(SLEEP_MODE_IDLE);
     while (1)
     {
-        sleep_mode();
     }
 
     return 0;
