@@ -12,6 +12,8 @@
 #define SEG_E (1 << PB2)
 #define SEG_F (1 << PB3)
 #define SEG_G (1 << PB4)
+#define DISABLE_D PORTD &= ~(SEG_A | SEG_B)
+#define DISABLE_B PORTB &= ~(SEG_C | SEG_D | SEG_E | SEG_F | SEG_G)
 
 // def states
 typedef enum
@@ -21,24 +23,26 @@ typedef enum
     YELLOW
 } State;
 
- volatile uint16_t digitalCounter = 0;
- volatile uint16_t secondCounter = 0;
-volatile uint8_t digit = 0;
+volatile uint16_t digitalCounter = 0;
+volatile uint16_t secondCounter = 0;
+volatile uint8_t digit = 9;
 volatile State currentState = RED;
+volatile uint8_t yellowCounter = 0;
+volatile uint8_t inYellowState = 0;
 
 void display_digit(int digit)
 {
 
     // Wyłącz segmenty wyświetlacza przed aktualizacją
-    PORTD &= ~(SEG_A | SEG_B);
-    PORTB &= ~(SEG_C | SEG_D | SEG_E | SEG_F | SEG_G);
+    DISABLE_B;
+    DISABLE_D;
 
     switch (digit)
     {
-    case 0:
-        PORTD = SEG_A | SEG_B;
-        PORTB = SEG_C | SEG_D | SEG_E | SEG_F;
-        break;
+        /* case 0:
+             PORTD = SEG_A | SEG_B;
+             PORTB = SEG_C | SEG_D | SEG_E | SEG_F;
+             break;   */
     case 1:
         PORTD = SEG_B;
         PORTB = SEG_C;
@@ -93,13 +97,17 @@ void changeState(State currentState)
     switch (currentState)
     {
     case RED:
-        PORTC |= (1 << PC0); // enable red led (A0)
+        PORTC |= (1 << PC0);
+        _delay_ms(1000); // enable red led (A0)
         break;
     case GREEN:
-        PORTC |= (1 << PC1); // enable green led (A1)
+        PORTC |= (1 << PC1);
+        _delay_ms(1000); // enable green led (A1)
         break;
     case YELLOW:
-        PORTC |= (1 << PC2); // enable yellow led (A2)
+        PORTC |= (1 << PC2);
+        _delay_ms(1000); // enable yellow led (A2)
+
         break;
     default:
         break;
@@ -122,35 +130,58 @@ ISR(TIMER1_COMPA_vect)
 
     digitalCounter++;
     secondCounter++;
-    PORTC ^= (1 << PC3);// reprezent 1 sec
+    PORTC ^= (1 << PC3); // reprezent 1 sec
 
-    // update the number  every 1 second
-    if (digitalCounter >= 1)
+    // Update the number every 1 second, except in the YELLOW state
+    if (digitalCounter >= 1 && currentState != YELLOW)
     {
-        display_digit(digit);
-        digit = (digit + 1) % 10;
+        display_digit(digit); // display digit
+        PORTC ^= (1 << PC3);
+        digit--;
+        if (digit < 1) // reset counter
+        {
+            digit = 9;
+            
+        }
         digitalCounter = 0;
+    }   else if (currentState == YELLOW)
+    {
+        DISABLE_B;
+        DISABLE_D;
+    }
+        // change state
+        if (currentState == YELLOW)
+        {
+           
+            // change state  3sec for yellow,
+        
+            if (secondCounter >= 3)
+            {
+                currentState = RED;
+                changeState(currentState);
+                secondCounter = 0;
+            }
+        }
+        else
+        {
+            // change state  9sec for green red,
+            if (secondCounter >= 9)
+            {
+                if (currentState == RED)
+                {
+                    currentState = GREEN;
+                }
+                else if (currentState == GREEN)
+                {
+                    currentState = YELLOW;
+                }
+
+                changeState(currentState);
+                secondCounter = 0; // reset counter
+            }
+        }
     }
 
-    // update state traffic light
-    if (secondCounter >= 9)
-    { // 9 sec every state
-        if (currentState == RED)
-        {
-            currentState = GREEN;
-        }
-        else if (currentState == GREEN)
-        {
-            currentState = YELLOW;
-        }
-        else if (currentState == YELLOW)
-        {
-            currentState = RED;
-        }
-        changeState(currentState);
-        secondCounter = 0; // reset counter
-    }
-}
 
 int main(void)
 {
