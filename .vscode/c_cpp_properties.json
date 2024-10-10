@@ -8,14 +8,14 @@
 
             ],
             "defines": [
-             "__AVR_ATmega328P__",
+             "__AVR_ATmega328p__",
                 "F_CPU=16000000UL"
 
 
             ],
             "compilerPath": "/usr/bin/avr-gcc"
             ,
-            "cStandard": "c17",
+            "cStandard": "c99",
             "cppStandard": "gnu++14",
             "intelliSenseMode": "linux-gcc-x64",
             "compilerArgs": [
