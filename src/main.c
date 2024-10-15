@@ -240,7 +240,7 @@ void control_device_based_on_light(uint16_t light_value)
 }
 
 // Inicjalizacja portu szeregowego
-void uart_init(unsigned int baud)
+void uart_init(unsigned long baud)
 {
     unsigned int ubrr = F_CPU / 16 / baud - 1;
     UBRR0H = (unsigned char)(ubrr >> 8);
